@@ -1,0 +1,27 @@
+{
+    "builders": [
+        {
+            "type": "docker",
+            "image": "ubuntu:16.04",
+            "commit": true,
+            "pull": "true",
+            "run_command": [
+                "-d",
+                "-i",
+                "-t",
+                "{{.Image}}",
+                "/bin/bash"
+            ]
+        }
+    ],
+    "provisioners": [
+        {
+            "type": "shell",
+            "script": "script.sh"
+        },
+        {
+            "type": "ansible-local",
+            "playbook_file": "common.yml"
+        }
+    ]
+ }
