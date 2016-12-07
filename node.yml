@@ -3,7 +3,6 @@
     - hosts: localhost
 
       vars:
-        swap_size: 2G
         remote_user: root
         rancher_server: 127.0.0.1
         rancher_port: 8080
