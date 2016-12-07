@@ -15,6 +15,7 @@
           - curl
           - openssl
           - apt-transport-https
+          - openssh
 
       - name: Add docker apt repo
         apt_repository:
@@ -59,5 +60,5 @@
       - name: make swap file
         command: mkswap /swapfile
 
-      - name: enable swap file
-        command: swapon /swapfile
+      #- name: enable swap file
+        #command: swapon /swapfile

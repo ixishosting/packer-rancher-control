@@ -22,6 +22,10 @@
         {
             "type": "ansible-local",
             "playbook_file": "common.yml"
+        },
+        {
+            "type": "ansible-local",
+            "playbook_file": "node.yml"
         }
     ]
  }

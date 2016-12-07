@@ -1,0 +1,112 @@
+---
+
+    - hosts: localhost
+
+      vars:
+        swap_size: 2G
+        remote_user: root
+        rancher_server: 127.0.0.1
+        rancher_port: 8080
+        rancher_agent_name: "agent"
+        rancher_agent_version: v1.0.2
+        rancher_api_access_key: foo
+        rancher_api_access_secret: bar
+        docker_volume_netshare_version: 0.18
+
+      tasks:
+
+      - name: Configure OpenSSH to listen on port 2020
+        lineinfile:
+          dest: /etc/ssh/sshd_config
+          regexp: "Port 22"
+          line: "Port 2020"
+
+      - name: Restart OpenSSH
+        service:
+          name: ssh
+          state: restarted
+
+      - name: create docker systemd config file
+        file: path=/etc/systemd/system/docker.service.d/ state=directory
+
+      - name: create docker systemd config file
+        file: path=/etc/systemd/system/docker.service.d/aws-credentials.conf state=touch
+
+      - name: insert/update IAM creds in /etc/systemd/system/docker.service.d/aws-credentials.conf
+        blockinfile:
+          dest: /etc/systemd/system/docker.service.d/aws-credentials.conf
+          block: |
+            [Service]
+            Environment="AWS_ACCESS_KEY_ID={{ AWS_ACCESS_KEY_ID }}"
+            Environment="AWS_SECRET_ACCESS_KEY={{ AWS_SECRET_ACCESS_KEY }}"
+            Environment="AWS_REGION={{ AWS_REGION }}"
+
+      - name: reload systemd configs
+        command: systemctl daemon-reload
+
+      - name: restart docker
+        service:
+          name: docker
+          state: restarted
+
+
+      - name: Get the default project id
+        action: uri
+          method: GET
+          status_code: 200
+          url: "http://{{ rancher_server }}:{{ rancher_port }}/v1/projects" return_content=yes
+          user: "{{ rancher_api_access_key }}"
+          password: "{{ rancher_api_access_secret }}"
+        register: project_id
+
+      - name: Return the registration token URL of Rancher server
+        action: uri
+          method: POST
+          status_code: 201
+          url: "http://{{ rancher_server }}:{{ rancher_port }}/v1/registrationtokens?projectId={{ project_id.json['data'][0]['id'] }}" return_content=yes
+          user: "{{ rancher_api_access_key }}"
+          password: "{{ rancher_api_access_secret }}"
+        register: rancher_token_url
+
+      - name: Return the registration URL of Rancher server
+        action: uri
+          method: GET
+          url: {{ rancher_token_url.json['links']['self'] }} return_content=yes
+          user: "{{ rancher_api_access_key }}"
+          password: "{{ rancher_api_access_secret }}"
+        register: rancher_token
+
+
+      - name: Check if the rancher-agent is running
+        command: docker ps -a
+        register: containers
+
+      - name: Register the Host machine with the Rancher server
+        docker:
+          image: rancher/agent:{{ rancher_agent_version }}
+          privileged: yes
+          detach: True
+          volumes: /var/run/docker.sock:/var/run/docker.sock
+          command: "{{ rancher_token.json['registrationUrl'] }}"
+          env:
+            CATTLE_HOST_LABELS: "aws.instance_id={{ ansible_ec2_instance_id }}&aws.availability_zone={{ ansible_ec2_placement_availability_zone }}"
+          state: started
+        when: "{{ 'rancher-agent' not in containers.stdout }}"
+
+      - name: Download docker-volume-netshare
+        get_url:
+          url: https://github.com/ContainX/docker-volume-netshare/releases/download/v{{ docker_volume_netshare_version }}/docker-volume-netshare_{{ docker_volume_netshare_version }}_amd64.deb
+          dest: /tmp/docker-volume-netshare_{{ docker_volume_netshare_version }}_amd64.deb
+
+      - name: Install docker-volume-netshare
+        apt:
+          deb: /tmp/docker-volume-netshare_{{ docker_volume_netshare_version }}_amd64.deb
+
+      - name: Start docker-volume-netshare service
+        service:
+          name: docker-volume-netshare
+          state: started
+
+      - name: Run docker-volume-netshare with nfs option
+        #command: daemon docker-volume-netshare nfs -o rw,hard,nointr > /var/log/docker-volume-netshare.log
+        command: daemon --command "docker-volume-netshare nfs -o actimeo=0,noatime,nolock,rw,bg,hard,rsize=32768,wsize=32768,vers=3,nointr,timeo=600,proto=tcp" > /var/log/docker-volume-netshare.log
