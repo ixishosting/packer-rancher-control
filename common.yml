@@ -15,7 +15,8 @@
           - curl
           - openssl
           - apt-transport-https
-          - openssh
+          - openssh-server
+          - systemd
 
       - name: Add docker apt repo
         apt_repository:

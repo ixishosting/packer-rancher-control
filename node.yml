@@ -3,13 +3,7 @@
     - hosts: localhost
 
       vars:
-        remote_user: root
-        rancher_server: 127.0.0.1
-        rancher_port: 8080
-        rancher_agent_name: "agent"
         rancher_agent_version: v1.0.2
-        rancher_api_access_key: foo
-        rancher_api_access_secret: bar
         docker_volume_netshare_version: 0.18
 
       tasks:
@@ -48,49 +42,9 @@
           name: docker
           state: restarted
 
-
-      - name: Get the default project id
-        action: uri
-          method: GET
-          status_code: 200
-          url: "http://{{ rancher_server }}:{{ rancher_port }}/v1/projects" return_content=yes
-          user: "{{ rancher_api_access_key }}"
-          password: "{{ rancher_api_access_secret }}"
-        register: project_id
-
-      - name: Return the registration token URL of Rancher server
-        action: uri
-          method: POST
-          status_code: 201
-          url: "http://{{ rancher_server }}:{{ rancher_port }}/v1/registrationtokens?projectId={{ project_id.json['data'][0]['id'] }}" return_content=yes
-          user: "{{ rancher_api_access_key }}"
-          password: "{{ rancher_api_access_secret }}"
-        register: rancher_token_url
-
-      - name: Return the registration URL of Rancher server
-        action: uri
-          method: GET
-          url: {{ rancher_token_url.json['links']['self'] }} return_content=yes
-          user: "{{ rancher_api_access_key }}"
-          password: "{{ rancher_api_access_secret }}"
-        register: rancher_token
-
-
-      - name: Check if the rancher-agent is running
-        command: docker ps -a
-        register: containers
-
-      - name: Register the Host machine with the Rancher server
-        docker:
-          image: rancher/agent:{{ rancher_agent_version }}
-          privileged: yes
-          detach: True
-          volumes: /var/run/docker.sock:/var/run/docker.sock
-          command: "{{ rancher_token.json['registrationUrl'] }}"
-          env:
-            CATTLE_HOST_LABELS: "aws.instance_id={{ ansible_ec2_instance_id }}&aws.availability_zone={{ ansible_ec2_placement_availability_zone }}"
-          state: started
-        when: "{{ 'rancher-agent' not in containers.stdout }}"
+      - name: pull rancher/server container
+        docker_image:
+          name: rancher/agent:{{ rancher_agent_version }}
 
       - name: Download docker-volume-netshare
         get_url:

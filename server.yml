@@ -3,27 +3,10 @@
     - hosts: localhost
 
       vars:
-        rancher_name: rancher_server
-        rancher_port: 8080
         rancher_version: v1.1.4
-        rancher_db_host: dbhost.xxx
-        rancher_db_name: dbname
-        rancher_db_user: dbuser
-        rancher_db_pass: dbpass
-        rancher_db_port: 3306
 
       tasks:
 
-      - name: Pull and run the Rancher/server container
-        docker:
-          name: "{{ rancher_name }}"
-          image: rancher/server:{{ rancher_version }}
-          restart_policy: always
-          ports:
-            - "{{ rancher_port }}:8080"
-          env:
-            CATTLE_DB_CATTLE_MYSQL_HOST: "{{ rancher_db_host }}"
-            CATTLE_DB_CATTLE_MYSQL_PORT: "{{ rancher_db_port }}"
-            CATTLE_DB_CATTLE_MYSQL_NAME: "{{ rancher_db_name }}"
-            CATTLE_DB_CATTLE_USERNAME: "{{ rancher_db_user }}"
-            CATTLE_DB_CATTLE_PASSWORD: "{{ rancher_db_pass }}"
+      - name: pull rancher/server container
+        docker_image:
+          name: rancher/server:{{ rancher_version }}
